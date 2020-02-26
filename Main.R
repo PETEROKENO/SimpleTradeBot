@@ -1,5 +1,5 @@
 # To separate entries in log files
-print("################# Start Log Entry #################")
+sprintf("################# Start Log Entry [%s] #################", Sys.time())
 
 library(devtools)
 install_github("DheerajAgarwal/rgdax", ref="dev")
@@ -36,37 +36,12 @@ curr_rsi14_api <- function(x) {
   rsi_gdax
 }
 # v.2
-rsi14_api_less_one <- function(x) {
+rsi14_api_less_x <- function(x) {
   df <- rgdax::public_candles(product_id = "ETH-USD",
                               granularity = 900)
-  rsi_gdax_less_one <- head(tail(TTR::RSI(df[,5],
-                                          n = 14),
-                                 n = 2), n = 1)
-  rsi_gdax_less_one
-}
-rsi14_api_less_two <- function(x) {
-  df <- rgdax::public_candles(product_id = "ETH-USD",
-                              granularity = 900)
-  rsi_gdax_less_two <- head(tail(TTR::RSI(df[,5],
-                                          n = 14),
-                                 n = 3), n = 1)
-  rsi_gdax_less_two
-}
-rsi14_api_less_three <- function(x) {
-  df <- rgdax::public_candles(product_id = "ETH-USD",
-                              granularity = 900)
-  rsi_gdax_less_three <- head(tail(TTR::RSI(df[,5],
-                                          n = 14),
-                                 n = 4), n = 1)
-  rsi_gdax_less_three
-}
-rsi14_api_less_four <- function(x) {
-  df <- rgdax::public_candles(product_id = "ETH-USD",
-                              granularity = 900)
-  rsi_gdax_less_four <- head(tail(TTR::RSI(df[,5],
-                                          n = 14),
-                                 n = 5), n = 1)
-  rsi_gdax_less_four
+  rsi_gdax_less <- head(tail(TTR::RSI(df[,5],
+                                      n = 14),
+                             n = 1 + x), n = 1)
 }
 
 bid <- function(x) {
@@ -95,13 +70,14 @@ buy_exe <- function(x) {
   # get order size in iterative manner
   order_size <- round(curr_bal_usd()/ask(),3)[1]-0.005
   # place initial order
-  while(curr_bal_eth() == 0) {
+  init_eth_bal <- curr_bal_eth()
+  while(curr_bal_eth() == init_eth_bal) {
     rgdax::add_order(product_id = "ETH-USD", api.key = api_key, secret = api_secret, passphrase = api_passphrase,
               type = "limit", price = bid(), side = "b", size = order_size)
     # sleep to see if order takes
     Sys.sleep(17)
     # check to see if ETH bal >= order amt
-    if (curr_bal_eth() > 0){"buysuccess"}else{
+    if (curr_bal_eth() > init_eth_bal){"buysuccess"}else{
       cancel_orders() # if curr_eth_bal not > 0, cancel order and start over
     }
   }
@@ -123,13 +99,13 @@ sell_exe <- function(x) {
 
 curr_rsi14_api <- curr_rsi14_api()
 Sys.sleep(2)
-rsi14_api_less_one <- rsi14_api_less_one()
+rsi14_api_less_one <- rsi14_api_less_x(1)
 Sys.sleep(2)
-rsi14_api_less_two <- rsi14_api_less_two()
+rsi14_api_less_two <- rsi14_api_less_x(2)
 Sys.sleep(2)
-rsi14_api_less_three <- rsi14_api_less_three()
+rsi14_api_less_three <- rsi14_api_less_x(3)
 Sys.sleep(2)
-rsi14_api_less_four <- rsi14_api_less_four()
+rsi14_api_less_four <- rsi14_api_less_x(4)
 Sys.sleep(2)
 
 order_price_tiered3 <- 99999
@@ -148,7 +124,8 @@ if (curr_bal_usd() >= 20) { # if we have more than $20 start loop
     Sys.sleep(100)
     
     # 2 save buy price in csv
-    position <- write.csv(bid(), file = "/Users/slayter/RStudio/TradeBot/position.csv")
+    position <- write.csv(bid(), file = "/Users/slayter/RStudio/TradeBot/position.csv",
+                          append = TRUE, sep = ",")
     
     # 3 send email
     send.mail(from = "<<YOUR_EMAIL_HERE>>",
@@ -166,28 +143,27 @@ if (curr_bal_usd() >= 20) { # if we have more than $20 start loop
     # 5 enter tiered limit sell orders
     
     # Order 1: ake 1/3 profits at 1%
+    curr_bid <- bid()
     order_size_tiered3 <- round(curr_bal_eth()/3,3)
-    order_price_tiered3 <- round(bid() * 1.01,2)
+    order_price_tiered3 <- round(curr_bid * 1.01,2)
     Sys.sleep(1)
     rgdax::add_order(product_id = "ETH-USD", api.key = api_key, secret = api_secret, passphrase = api_passphrase,
               type = "limit", price = order_price_tiered3, side = "s", size = order_size_tiered3)
     Sys.sleep(20)
     # Order 2: take 1/3 profits at 4% gain
     order_size_tiered5 <- round(curr_bal_eth()/2,3)
-    order_price_tiered5 <- round(bid() * 1.04,2)
+    order_price_tiered5 <- round(curr_bid * 1.04,2)
     Sys.sleep(1)
     rgdax::add_order(product_id = "ETH-USD", api.key = api_key, secret = api_secret, passphrase = api_passphrase,
               type = "limit", price = order_price_tiered5, side = "s", size = order_size_tiered5)
     Sys.sleep(20)
     # Order 3: take 1/3 profits at 7%
     order_size_tiered8 <- round(curr_bal_eth(),3)
-    order_price_tiered8 <- round(bid() * 1.07,2)
+    order_price_tiered8 <- round(curr_bid * 1.07,2)
     Sys.sleep(1)
     rgdax::add_order(product_id = "ETH-USD", api.key = api_key, secret = api_secret, passphrase = api_passphrase,
               type = "limit", price = order_price_tiered8, side = "s", size = order_size_tiered8)
   }else{"nobuy-badtime"}
 }else{"nobuy-lowbal"}
 
-Sys.time()
-
-print("################# End Log Entry #################")
+sprintf("################# End Log Entry [%s] #################", Sys.time())
